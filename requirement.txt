@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+matplotlib.pyplot
+seaborn
+plotly.express
+plotly.figure_factory
+fetch_ucirepo
+enable_iterative_imputer
+IterativeImputer
+io

@@ -9,6 +9,8 @@ from ucimlrepo import fetch_ucirepo
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 import io
+# We no longer need 'missingno'
+# import missingno as msno 
 
 # --- Streamlit Page Configuration ---
 st.set_page_config(layout="wide", page_title="Liver Disease Dataset Analyzer")
@@ -22,11 +24,11 @@ def load_hepatitis_data():
         hepatitis = fetch_ucirepo(id=46)
     except Exception as e:
         st.error(f"Failed to load Hepatitis dataset: {e}")
-        return None, None, None
+        return None, None, None, None
 
     X = hepatitis.data.features
     y = hepatitis.data.targets
-    df_raw = pd.concat([X, y], axis=1)
+    df_raw = pd.concat([X, y], axis=1) # This is the raw data we need
     df_clean = df_raw.copy()
 
     # 1. Calculate and record initial missing values (for reporting)
@@ -66,7 +68,7 @@ def load_hepatitis_data():
     info_str = buffer.getvalue()
     buffer.close()
 
-    return df_clean, missing_df, info_str
+    return df_clean, df_raw, missing_df, info_str
 
 @st.cache_data
 def load_cirrhosis_data():
@@ -75,11 +77,11 @@ def load_cirrhosis_data():
         cirrhosis = fetch_ucirepo(id=878)
     except Exception as e:
         st.error(f"Failed to load Cirrhosis dataset: {e}")
-        return None, None, None
+        return None, None, None, None 
     
     X = cirrhosis.data.features
     y = cirrhosis.data.targets
-    df_raw = pd.concat([X, y], axis=1)
+    df_raw = pd.concat([X, y], axis=1) # This is the raw data
     df_clean = df_raw.copy()
 
     # 1. Calculate and record initial missing values (for reporting)
@@ -132,12 +134,12 @@ def load_cirrhosis_data():
     info_str = buffer.getvalue()
     buffer.close()
 
-    return df_clean, missing_df, info_str
+    return df_clean, df_raw, missing_df, info_str
 
 
 # Load all data
-df_hepatitis_clean, hepatitis_missing_df, hepatitis_info_str = load_hepatitis_data()
-df_cirrhosis_clean, cirrhosis_missing_df, cirrhosis_info_str = load_cirrhosis_data()
+df_hepatitis_clean, df_hepatitis_raw, hepatitis_missing_df, hepatitis_info_str = load_hepatitis_data()
+df_cirrhosis_clean, df_cirrhosis_raw, cirrhosis_missing_df, cirrhosis_info_str = load_cirrhosis_data()
 
 
 # --- PLOTTING FUNCTION 1: Symptom Mortality Proportion (Hepatitis) ---
@@ -158,6 +160,9 @@ def plot_hepatitis_mortality_proportion(df, feature_col, ax, add_legend=False):
     # The output is P(Class=1 | Symptom)
     mortality_prop = df_temp.groupby(feature_col)['Mortality'].mean().reset_index()
     mortality_prop.columns = [feature_col, 'Proportion']
+    
+    # This plot uses dark_background, which is fine
+    plt.style.use('dark_background') 
 
     # Use Matplotlib/Seaborn for the desired style
     sns.barplot(
@@ -187,6 +192,8 @@ def plot_hepatitis_mortality_proportion(df, feature_col, ax, add_legend=False):
         proxy_handle = plt.Rectangle((0,0),1,1, fc='#348ABD', edgecolor='black')
         ax.legend([proxy_handle], ['2'], title='Class', loc='center right', 
                    bbox_to_anchor=(1.25, 0.8), fontsize=10, title_fontsize=12)
+                   
+    plt.rcdefaults() # Reset after this plot
 
 
 # --- PLOTTING FUNCTION 2: Age vs Status/Class Violin Plot (Hepatitis & Cirrhosis) ---
@@ -247,15 +254,80 @@ def display_data_summary(df, info_str, title):
 
 
 # --- DISPLAY FUNCTION 2: Missing Values ---
-def display_missing_values_content(hep_missing_df, cirr_missing_df):
-    st.subheader("Missing Value Report (Raw Data)")
+# <-- THIS IS THE MODIFIED FUNCTION ---
+def display_missing_values_content(df_hep_raw, hep_missing_df, df_cirr_raw, cirr_missing_df):
+    """Displays both the missing value matrices and the data tables."""
+    
+    st.subheader("Missing Value Heatmap (Raw Data)")
+    st.markdown("This plot shows the distribution of missing data (yellow) **before** any cleaning or imputation was applied.")
+
     col1, col2 = st.columns(2)
+    
+    # Use dark_background style for both plots
+    plt.style.use('dark_background')
+    
     with col1:
         st.markdown("**Hepatitis Dataset**")
-        st.dataframe(hep_missing_df[hep_missing_df['Missing Count'] > 0])
+        if df_hep_raw is not None:
+            # Create a matplotlib figure
+            fig, ax = plt.subplots(figsize=(10, 5))
+            
+            # --- USING SEABORN.HEATMAP INSTEAD OF MISSINGNO ---
+            sns.heatmap(
+                df_hep_raw.isnull(), 
+                ax=ax,
+                cbar=False,           # Do not show the color bar
+                cmap='viridis',       # Use 'viridis' (purple/yellow) colormap
+                yticklabels=False     # Hide the y-axis labels (index)
+            )
+            ax.set_title("Hepatitis Missing Values", fontsize=14)
+            ax.set_xlabel("Feature")
+            ax.set_ylabel("Values")
+            
+            # Display in Streamlit
+            st.pyplot(fig) 
+            plt.close(fig) # Close the figure
+        else:
+            st.warning("Hepatitis raw data not available.")
+    
     with col2:
         st.markdown("**Cirrhosis Dataset**")
+        if df_cirr_raw is not None:
+            # Create a matplotlib figure
+            fig, ax = plt.subplots(figsize=(10, 5))
+
+            # --- USING SEABORN.HEATMAP INSTEAD OF MISSINGNO ---
+            sns.heatmap(
+                df_cirr_raw.isnull(), 
+                ax=ax,
+                cbar=False,
+                cmap='viridis',
+                yticklabels=False
+            )
+            ax.set_title("Cirrhosis Missing Values", fontsize=14)
+            ax.set_xlabel("Feature")
+            ax.set_ylabel("Values")
+            
+            # Display in Streamlit
+            st.pyplot(fig)
+            plt.close(fig) # Close the figure
+        else:
+            st.warning("Cirrhosis raw data not available.")
+
+    # Reset matplotlib defaults
+    plt.rcdefaults() 
+    
+    st.markdown("---") # Add a separator
+
+    st.subheader("Missing Value Report (Raw Data)")
+    col3, col4 = st.columns(2) # Use new column variables
+    with col3:
+        st.markdown("**Hepatitis Dataset**")
+        st.dataframe(hep_missing_df[hep_missing_df['Missing Count'] > 0])
+    with col4:
+        st.markdown("**Cirrhosis Dataset**")
         st.dataframe(cirr_missing_df[cirr_missing_df['Missing Count'] > 0])
+# <-- END OF MODIFIED FUNCTION ---
 
 
 # --- DISPLAY FUNCTION 3: Correlation Heatmaps (Interactive with Filter) ---
@@ -348,6 +420,8 @@ def display_comparison_content(df_hepatitis_clean, df_cirrhosis_clean):
     st.markdown("**(Class: 1=Dead, 2=Live; Symptom: 1=No, 2=Yes)**")
     
     if df_hepatitis_clean is not None:
+        # This plot is NOT affected by our change, because it uses
+        # 'dark_background' explicitly, which is fine.
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
         plt.style.use('dark_background') # Apply dark background for the look
 
@@ -461,8 +535,14 @@ def main():
         tab_missing, tab_correlation = st.tabs(["📊 Missing Value Report", "📈 Correlation Heatmaps"])
 
         with tab_missing:
+            # This function is now the simple version
             if hepatitis_missing_df is not None and cirrhosis_missing_df is not None:
-                display_missing_values_content(hepatitis_missing_df, cirrhosis_missing_df)
+                display_missing_values_content(
+                    df_hepatitis_raw, 
+                    hepatitis_missing_df, 
+                    df_cirrhosis_raw, 
+                    cirrhosis_missing_df
+                )
             else:
                 st.error("Missing value data is not available.")
         
@@ -487,8 +567,11 @@ if __name__ == "__main__":
         from sklearn.impute import IterativeImputer
         import plotly.figure_factory as ff
         import plotly.express as px
+        # import missingno as msno # No longer needed
     except ImportError as e:
         st.error(f"Please ensure all necessary libraries are installed. Missing library: {e.name}")
+        # if e.name == 'missingno':
+        #      st.error("You may need to run: pip install missingno")
         st.stop()
         
     main()

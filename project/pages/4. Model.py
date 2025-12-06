@@ -103,7 +103,26 @@ def display_model():
     
     st.title("💡 Model Prediction Tool")
     st.markdown("Use this tool to simulate a patient's results and see the predicted risk of a target condition across different models.")
-    
+    st.info("""
+            🌟Introduction: 
+            When you take body test, you will get the precise data from the test. Enter your body data in this 
+            application, you can get the probabiliy of the liver disease.
+
+            🙋🏻‍♀️Name of the most important features:
+            - Total Bilirubin refers to the total amount of bilirubin currently circulating in your blood.
+            An increase in total bilirubin is a very important sign or symptom that a problem exists in the 
+            system that processes bilirubin, and this problem very often involves the liver or bile ducts.
+            - Alkaline Phosphatase (ALP) is an enzyme—a type of protein that speeds up specific chemical 
+            reactions—found throughout your body. ALP has higher correlation with liver disease.
+            - AST is an enzyme that plays a crucial role in metabolizing amino acids. An increased AST 
+            level is generally a positive indicator of liver cell damage, 
+            but it must be interpreted alongside other liver tests, especially ALT, to rule out other causes.
+            - Albumin is the most abundant protein in your blood plasma. It is produced exclusively by the liver 
+            and performs several critical functions for your body.
+            The level of albumin in your blood has a NEGATIVE correlation with chronic liver disease. This means 
+            that as liver disease progresses and worsens, the albumin level decreases
+            """)
+
     # --- 1. Interactive Prediction Tool ---
     
     st.header("🔮 Patient Input and Prediction")

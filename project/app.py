@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 
 # --- Configuration ---
 st.set_page_config(
-    page_title="Multi-Dataset Analysis Platform",
+    page_title="Liver Disease Analysis Platform",
     page_icon="📊",
     layout="wide"
 )
@@ -55,7 +55,7 @@ if 'datasets' not in st.session_state:
     st.session_state.datasets = datasets
 
 # --- Page Header ---
-st.title("📊 Multi-Dataset Analysis Platform")
+st.title("📊 Liver Disease Analysis Platform")
 st.markdown("### Overview Dashboard")
 st.markdown("Welcome! This platform provides comprehensive analysis of liver disease datasets.")
 
@@ -178,34 +178,6 @@ if data_loaded_count > 0:
             st.markdown("**Available Columns:**")
             col_display = ", ".join(df.columns.tolist())
             st.text(col_display)
-    
-    st.divider()
-    
-    # --- Missing Data Analysis ---
-    st.subheader("🔍 Missing Data Analysis")
-    
-    missing_data = {}
-    for name, df in dataset_info.items():
-        missing_count = df.isnull().sum()
-        if missing_count.sum() > 0:
-            missing_data[name] = missing_count[missing_count > 0]
-    
-    if missing_data:
-        cols = st.columns(len(missing_data))
-        for idx, (name, missing) in enumerate(missing_data.items()):
-            with cols[idx]:
-                st.markdown(f"**{name}**")
-                fig = px.bar(
-                    x=missing.values, 
-                    y=missing.index,
-                    orientation='h',
-                    labels={'x': 'Missing Count', 'y': 'Column'},
-                    title=f"Missing Values"
-                )
-                fig.update_layout(height=300, showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.success("✅ No missing values found in any dataset!")
     
 else:
     st.error("❌ No datasets were loaded successfully. Please check your data files and paths.")

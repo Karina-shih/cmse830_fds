@@ -90,13 +90,9 @@ def run_preprocessing(df_raw, name):
         if 'Alamine_Aminotransferase' in df_processed.columns and 'Aspartate_Aminotransferase' in df_processed.columns:
             # Add a small epsilon to the denominator to prevent division by zero
             df_processed['AST_ALT_Ratio'] = df_processed['Aspartate_Aminotransferase'] / (df_processed['Alamine_Aminotransferase'] + epsilon)
-            
-    # 5. Categorical Encoding (Placeholder)
-    # OHE is skipped here for focused demo
     
     return df_processed
 
-# --- Comparison Plot Function using KDE (Unchanged) ---
 def display_imputation_comparison(df_raw, df_processed, selected_name):
     """
     Displays a comparison of a numerical feature's distribution before and after 
@@ -110,14 +106,18 @@ def display_imputation_comparison(df_raw, df_processed, selected_name):
     cols_with_nan = numerical_cols[df_raw[numerical_cols].isnull().any()].tolist()
     
     if not cols_with_nan:
-        st.info(f"All numerical features in **{selected_name}** were already complete or did not require imputation.")
+        st.info(f"✅ All numerical features in **{selected_name}** were already complete and did not require imputation.")
+        st.markdown("**Data Quality Summary:**")
+        st.markdown(f"- Total numerical features: {len(numerical_cols)}")
+        st.markdown(f"- Features with missing values: 0")
+        st.markdown(f"- Data completeness: 100%")
         return
 
     # Select feature to compare
     selected_feature = st.selectbox(
         "Select Numerical Feature to Compare",
         cols_with_nan,
-        key=f"kde_feat_{selected_name}", # Unique key for selectbox
+        key=f"kde_feat_{selected_name}",
         help="Features listed had missing values and were imputed using KNN."
     )
     
@@ -145,38 +145,68 @@ def display_imputation_comparison(df_raw, df_processed, selected_name):
         
         # Display key statistics for quantitative assessment
         st.markdown(f"**Statistics for {selected_feature}**")
+        
+        # 修正：直接使用浮點數，不需要 .round()
+        raw_mean = raw_data.mean()
+        imputed_mean = processed_data.mean()
+        raw_std = raw_data.std()
+        imputed_std = processed_data.std()
+        missing_count = df_raw[selected_feature].isnull().sum()
+        
         stats = pd.DataFrame({
-            'Raw Mean': [raw_data.mean().round(4)],
-            'Imputed Mean': [processed_data.mean().round(4)],
-            'Raw Std Dev': [raw_data.std().round(4)],
-            'Imputed Std Dev': [processed_data.std().round(4)],
-            'Missing Count': [df_raw[selected_feature].isnull().sum()]
-        }).T.rename(columns={0: 'Value'})
+            'Value': [
+                f'{raw_mean:.4f}',
+                f'{imputed_mean:.4f}',
+                f'{raw_std:.4f}',
+                f'{imputed_std:.4f}',
+                f'{missing_count}'
+            ]
+        }, index=['Raw Mean', 'Imputed Mean', 'Raw Std Dev', 'Imputed Std Dev', 'Missing Count'])
+        
         st.dataframe(stats)
 
     except Exception as e:
         st.error(f"An error occurred while plotting the KDE comparison: {e}")
 
 
-# --- Violin Plot Function (Unchanged) ---
-# --- Violin Plot Function (Modified to standardize NaNs before plotting) ---
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px 
+
 def display_violin_plot(df, selected_name):
     """
     Displays an interactive Violin Plot comparing a categorical column 
     against a numerical column.
     """
     st.subheader("🎻 Violin Plot: Distribution Comparison")
+   
+    df_work = df.copy()
+ 
+    if 'Sex' in df_work.columns:
+        df_work = df_work.rename(columns={'Sex': 'Gender'})
+  
+    if 'Gender' in df_work.columns:
+        df_work['Gender'] = df_work['Gender'].astype(str)
 
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    numerical_cols = df.select_dtypes(include=np.number).columns.tolist()
+    categorical_cols = df_work.select_dtypes(include=['object', 'category']).columns.tolist()
+    numerical_cols = df_work.select_dtypes(include=np.number).columns.tolist()
+
+    id_keywords = ['id', 'idx', 'code', 'key']
+    categorical_cols = [
+        col for col in categorical_cols 
+        if not any(keyword in col.lower() for keyword in id_keywords)
+    ]
 
     if not categorical_cols or not numerical_cols:
         st.warning("The dataset lacks both categorical and numerical features required for a Violin Plot.")
         return
 
     col1, col2 = st.columns(2)
+    default_x_index = 0
+    if 'Gender' in categorical_cols:
+        default_x_index = categorical_cols.index('Gender')
     
-    default_x_index = categorical_cols.index('Gender') if 'Gender' in categorical_cols else 0
     selected_x_cat = col1.selectbox(
         "Choose the Categorical Feature (X-Axis)",
         categorical_cols,
@@ -194,24 +224,14 @@ def display_violin_plot(df, selected_name):
     
     try:
         # Create a copy to modify without affecting the original DataFrame
-        df_plot = df.copy() 
-        
-        # --- NEW STEP 1: Aggressively convert non-standard missing values to NaN ---
-        # If the categorical column is an object type, replace known missing strings with numpy.nan
+        df_plot = df_work.copy() 
         if df_plot[selected_x_cat].dtype == 'object':
             # Replace empty strings ('') and strings containing only spaces (' ') with NaN
             df_plot[selected_x_cat] = df_plot[selected_x_cat].replace({
                 '': np.nan, 
                 ' ': np.nan
             })
-            # Also, attempt to replace common string representations of missing values if they exist
-            df_plot[selected_x_cat] = df_plot[selected_x_cat].replace([
-                'N/A', 'NA', 'None', 'NULL', 'nan'
-            ], np.nan)
 
-
-        # --- NEW STEP 2: Filter out rows where the selected categorical or numerical feature is NaN ---
-        # This will now catch both standard np.nan and the aggressively converted NaNs
         df_plot.dropna(subset=[selected_x_cat, selected_y_num], inplace=True)
         
         if df_plot.empty:
@@ -222,7 +242,7 @@ def display_violin_plot(df, selected_name):
         df_plot[selected_x_cat] = df_plot[selected_x_cat].astype(str)
         
         fig_violin = px.violin(
-            df_plot, # Use the filtered and cleaned DataFrame
+            df_plot,
             x=selected_x_cat,
             y=selected_y_num,
             box=True,      
@@ -232,7 +252,7 @@ def display_violin_plot(df, selected_name):
         )
 
         fig_violin.update_layout(showlegend=False)
-        st.plotly_chart(fig_violin, use_container_width=True)
+        st.plotly_chart(fig_violin, use_container_width=True, key=f"violin_plot_{selected_name}")
 
     except Exception as e:
         st.error(f"An error occurred while plotting the Violin Plot: {e}")
@@ -322,7 +342,8 @@ def display_3d_plots(datasets):
                             zaxis_title=selected_z
                         )
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    # *** 修復點：為 st.plotly_chart 添加獨一無二的 key ***
+                    st.plotly_chart(fig, use_container_width=True, key=f"3d_plots_{name}")
                     
                 except Exception as e:
                     st.error(f"An error occurred while plotting the 3D chart for {name}: {e}")
@@ -365,7 +386,7 @@ def display_feature_importance_plot(df, selected_name):
         )
         
         fig.update_layout(yaxis={'categoryorder':'total ascending'}) 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key=f"importance_plot_{selected_name}")
         
         st.caption("Note: Scores are randomly generated for demonstration purposes in the Preprocessing step.")
         
@@ -380,7 +401,10 @@ def display_preprocessing():
     """Displays the Data Preprocessing section."""
     
     st.title("🔧 Data Preprocessing")
-    st.markdown("This page demonstrates the data cleaning and transformation steps applied to prepare the data for modeling.")
+    st.markdown("""
+                🌟This page demonstrates the data cleaning and transformation steps applied to prepare the data for 
+                modeling.
+                """)
 
     if 'datasets' not in st.session_state or not st.session_state.datasets:
         st.error("Error: Datasets are not loaded. Please return to the Home page to check the loading status.")

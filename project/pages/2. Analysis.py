@@ -39,7 +39,14 @@ def display_analysis():
     """Displays the Exploratory Data Analysis (EDA) section."""
     
     st.title("✏️ Data Analysis (EDA)")
-    st.markdown("This section provides tools for exploring data distributions, correlations, and relationships within the selected dataset.")
+    st.markdown("""
+                🌟This section provides tools for exploring data distributions, correlations, and relationships within 
+                the selected dataset.
+                - Choose the dataset at side column
+                - In distribution plot, features can be choosen.
+                - Correlation Matrix, this is an interactive plot when you hover over it, a tooltip appears.
+                - Relationship Scatter, this display the relationship between 2 features.
+                """)
 
     if 'datasets' not in st.session_state or not st.session_state.datasets:
         st.error("Error: Datasets are not loaded. Please go back to the Home page to check the loading status.")
